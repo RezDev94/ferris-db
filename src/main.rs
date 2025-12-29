@@ -10,7 +10,7 @@ fn main() {
     let mut input = String::new();
 
     println!("Welcome to ferris-db!");
-    println!("Commands: GET <key>, SET <key> <value>, DELETE <key>, RENAME <old_key> <new_key>, KEYS, COUNT, CLEAR, EXIT");
+    println!("Commands: GET <key>, SET <key> <value> <ttl>, DELETE <key>, RENAME <old_key> <new_key>, EXPIRE <key> <ttl>, KEYS, COUNT, CLEAR, EXIT");
 
     loop {
         print!("> ");
@@ -26,8 +26,8 @@ fn main() {
                     None => println!("Error: Key not found"),
                 }
             }
-            Command::Set { key, value } => {
-                match store.set(key, value) {
+            Command::Set { key, value, ttl } => {
+                match store.set(key, value, ttl) {
                     Ok(()) => println!("OK"),
                     Err(e) => println!("Error: {}", e),
                 }
@@ -41,6 +41,18 @@ fn main() {
             Command::Rename { old_key, new_key } => {
                 match store.rename(old_key, new_key) {
                     Ok(()) => println!("OK"),
+                    Err(e) => println!("Error: {}", e),
+                }
+            }
+            Command::Expire { key, ttl } => {
+                match store.expire(key, ttl) {
+                    Ok(()) => println!("OK"),
+                    Err(e) => println!("Error: {}", e),
+                }
+            }
+            Command::TTL { key } => {
+                match store.ttl(key) {
+                    Ok(ttl) => println!("{}", ttl),
                     Err(e) => println!("Error: {}", e),
                 }
             }
@@ -63,7 +75,7 @@ fn main() {
                 break;
             }
             Command::Unknown(cmd) => {
-                println!("Error: Unknown command <{}>", cmd.trim());
+                println!("Error: <{}>", cmd.trim());
             }
         }
     }
