@@ -53,8 +53,10 @@ fn main() {
                 println!("{}", store.count());
             }
             Command::Clear => {
-                store.clear();
-                println!("OK");
+                match store.clear() {
+                    Ok(()) => println!("OK"),
+                    Err(e) => println!("Error: {}", e),
+                }
             }
             Command::Exit => {
                 println!("Goodbye!");
