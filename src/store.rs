@@ -1,5 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs};
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 pub struct Store {
     data: HashMap<String, String>,
 }
@@ -10,7 +12,13 @@ impl Store {
     }
 
     pub fn new() -> Self {
-        Store { data: HashMap::new() }
+        let store = Store { data: HashMap::new() };
+        match Store::load() {
+            Ok(store) => store,
+            Err(_) => {
+                store
+            }
+        }
     }
 
     pub fn set(&mut self, key: String, value: String) -> Result<(), String> {
@@ -18,7 +26,7 @@ impl Store {
             return Err("Key already exists".to_string());
         }
         self.data.insert(key, value);
-        Ok(())
+        self.save()
     }
 
     pub fn get(&self, key: &str) -> Option<&String> {
@@ -30,7 +38,7 @@ impl Store {
             return Err("Key does not exist".to_string());
         }
         self.data.remove(key);
-        Ok(())
+        self.save()
     }
 
     pub fn keys(&self) -> Vec<&String> {
@@ -41,8 +49,9 @@ impl Store {
         self.data.len()
     }
 
-    pub fn clear(&mut self) {
+    pub fn clear(&mut self) -> Result<(), String> {
         self.data.clear();
+        self.save()
     }
 
     pub fn rename(&mut self, old_key: String, new_key: String) -> Result<(), String> {
@@ -56,6 +65,23 @@ impl Store {
 
         let value = self.data.remove(&old_key).unwrap();
         self.data.insert(new_key, value);
-        Ok(())
+        self.save()
+    }
+
+    pub fn save(&self) -> Result<(), String> {
+        let path = "data.json";
+        let json = serde_json::to_string(&self.data)
+            .map_err(|e| e.to_string())?;
+        fs::write(path, json)
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn load() -> Result<Store, String> {
+        let path = "data.json";
+        let contents = fs::read_to_string(path)
+            .map_err(|e| e.to_string())?;
+        let data = serde_json::from_str(&contents)
+            .map_err(|e| e.to_string())?;
+        Ok(Store { data })
     }
 }
