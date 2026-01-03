@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum Command {
     Get {
         key: String,
@@ -5,7 +6,7 @@ pub enum Command {
     Set {
         key: String,
         value: String,
-        ttl: u64,
+        ttl: Option<u64>,
     },
     Delete {
         key: String,
@@ -24,7 +25,6 @@ pub enum Command {
     Keys,
     Count,
     Clear,
-    Exit,
     Unknown(String),
 }
 
@@ -42,9 +42,16 @@ impl Command {
                     Ok(ttl_from_input) => Command::Set {
                         key: key.to_string(),
                         value: value.to_string(),
-                        ttl: ttl_from_input,
+                        ttl: Some(ttl_from_input),
                     },
                     Err(_) => Command::Unknown(format!("Invalid TTL: {:?}", ttl)),
+                }
+            }
+            ["SET", key, value] => {
+                Command::Set {
+                    key: key.to_string(),
+                    value: value.to_string(),
+                    ttl: None,
                 }
             }
             ["DELETE", key] => Command::Delete {
@@ -70,7 +77,6 @@ impl Command {
             ["KEYS"] => Command::Keys,
             ["COUNT"] => Command::Count,
             ["CLEAR"] => Command::Clear,
-            ["EXIT"] => Command::Exit,
             _ => Command::Unknown(format!("Unknown command {}", input.to_string())),
         }
     }
