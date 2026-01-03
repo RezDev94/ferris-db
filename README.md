@@ -16,6 +16,14 @@ In another terminal execute this command for the CLI:
 cargo run --bin ferris-cli
 ```
 
+There are two mode for the CLI:
+1. Interactive mode - which you could run all CLI commands.
+2. One Shot mode - which you could run commands like below
+
+```shell
+cargo run --bin ferris-cli SET key value 100
+```
+
 ## How to use the CLI
 
 
