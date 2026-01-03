@@ -9,27 +9,32 @@ struct StoreData {
     key: String,
     value: String,
     #[serde(with = "system_time_serde")]
-    ttl: SystemTime,
+    ttl: Option<SystemTime>,
 }
 
 mod system_time_serde {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-    pub fn serialize<S>(time: &SystemTime, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(time: &Option<SystemTime>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let duration = time.duration_since(UNIX_EPOCH).unwrap();
-        duration.as_secs().serialize(serializer)
+        match time {
+            Some(t) => {
+                let duration = t.duration_since(UNIX_EPOCH).unwrap();
+                Some(duration.as_secs()).serialize(serializer)
+            }
+            None => None::<u64>.serialize(serializer),
+        }
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<SystemTime, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<SystemTime>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let secs = u64::deserialize(deserializer)?;
-        Ok(UNIX_EPOCH + Duration::from_secs(secs))
+        let secs: Option<u64> = Option::deserialize(deserializer)?;
+        Ok(secs.map(|s| UNIX_EPOCH + Duration::from_secs(s)))
     }
 }
 
@@ -51,27 +56,26 @@ impl Store {
         }
     }
 
-    pub fn set(&mut self, key: String, value: String, ttl: u64) -> Result<(), String> {
+    pub fn set(&mut self, key: String, value: String, ttl: Option<u64>) -> Result<(), String> {
         if self.exists(&key) {
             return Err("Key already exists".to_string());
         }
         self.data.push(StoreData {
             key,
             value,
-            ttl: SystemTime::now() + Duration::from_secs(ttl),
+            ttl: ttl.map(|t| SystemTime::now() + Duration::from_secs(t)),
         });
         self.save()
     }
 
     pub fn get(&self, key: &str) -> Option<&String> {
-        let found_element = self
-            .data
+        self.data
             .iter()
-            .find(|data| data.key == key && data.ttl > SystemTime::now());
-        match found_element {
-            Some(element) => Some(&element.value),
-            None => None,
-        }
+            .find(|data| {
+                data.key == key
+                    && data.ttl.map_or(true, |t| t > SystemTime::now())
+            })
+            .map(|element| &element.value)
     }
 
     pub fn delete(&mut self, key: &str) -> Result<(), String> {
@@ -119,22 +123,24 @@ impl Store {
         }
 
         let element = self.data.iter_mut().find(|data| data.key == key).unwrap();
-        element.ttl = SystemTime::now() + Duration::from_secs(ttl);
+        element.ttl = Some(SystemTime::now() + Duration::from_secs(ttl));
         self.save()
     }
 
-    pub fn ttl(&self, key: String) -> Result<u64, String> {
+    pub fn ttl(&self, key: String) -> Result<Option<u64>, String> {
         if !self.exists(&key) {
             return Err("Key does not exist".to_string());
         }
 
         let element = self.data.iter().find(|data| data.key == key).unwrap();
-        let ttl = element
-            .ttl
-            .duration_since(SystemTime::now());
-        match ttl {
-            Ok(duration) => Ok(duration.as_secs()),
-            Err(_) => Err("Key is expired".to_string()),
+        match element.ttl {
+            None => Ok(None), // No expiration
+            Some(expiry) => {
+                match expiry.duration_since(SystemTime::now()) {
+                    Ok(duration) => Ok(Some(duration.as_secs())),
+                    Err(_) => Err("Key is expired".to_string()),
+                }
+            }
         }
     }
 
