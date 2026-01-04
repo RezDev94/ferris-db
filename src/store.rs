@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::time::SystemTime;
 use std::{fs, time::Duration};
 
@@ -6,7 +7,6 @@ const DATA_FILE: &str = "data.json";
 
 #[derive(Serialize, Deserialize)]
 struct StoreData {
-    key: String,
     value: String,
     #[serde(with = "system_time_serde")]
     ttl: Option<SystemTime>,
@@ -40,16 +40,16 @@ mod system_time_serde {
 
 #[derive(Serialize, Deserialize)]
 pub struct Store {
-    data: Vec<StoreData>,
+    data: HashMap<String, StoreData>,
 }
 
 impl Store {
     fn exists(&self, key: &str) -> bool {
-        self.data.iter().any(|data| data.key == key)
+        self.data.contains_key(key)
     }
 
     pub fn new() -> Self {
-        let store = Store { data: vec![] };
+        let store = Store { data: HashMap::new() };
         match Store::load() {
             Ok(store) => store,
             Err(_) => store,
@@ -60,8 +60,7 @@ impl Store {
         if self.exists(&key) {
             return Err("Key already exists".to_string());
         }
-        self.data.push(StoreData {
-            key,
+        self.data.insert(key, StoreData {
             value,
             ttl: ttl.map(|t| SystemTime::now() + Duration::from_secs(t)),
         });
@@ -70,24 +69,20 @@ impl Store {
 
     pub fn get(&self, key: &str) -> Option<&String> {
         self.data
-            .iter()
-            .find(|data| {
-                data.key == key
-                    && data.ttl.map_or(true, |t| t > SystemTime::now())
-            })
-            .map(|element| &element.value)
+            .get(key)
+            .map(|data| &data.value)
     }
 
     pub fn delete(&mut self, key: &str) -> Result<(), String> {
         if !self.exists(key) {
             return Err("Key does not exist".to_string());
         }
-        self.data.retain(|data| data.key != key);
+        self.data.remove(key);
         self.save()
     }
 
     pub fn keys(&self) -> Vec<&String> {
-        self.data.iter().map(|data| &data.key).collect()
+        self.data.keys().collect()
     }
 
     pub fn count(&self) -> usize {
@@ -108,12 +103,9 @@ impl Store {
             return Err("New key already exists".to_string());
         }
 
-        let index = self
-            .data
-            .iter()
-            .position(|data| data.key == old_key)
-            .unwrap();
-        self.data[index].key = new_key;
+        let data = self.data.remove(&old_key).unwrap();
+
+        self.data.insert(new_key, data);
         self.save()
     }
 
@@ -122,7 +114,7 @@ impl Store {
             return Err("Key does not exist".to_string());
         }
 
-        let element = self.data.iter_mut().find(|data| data.key == key).unwrap();
+        let element = self.data.get_mut(&key).unwrap();
         element.ttl = Some(SystemTime::now() + Duration::from_secs(ttl));
         self.save()
     }
@@ -132,14 +124,12 @@ impl Store {
             return Err("Key does not exist".to_string());
         }
 
-        let element = self.data.iter().find(|data| data.key == key).unwrap();
-        match element.ttl {
-            None => Ok(None), // No expiration
+        let data = self.data.get(&key).unwrap();
+        match data.ttl {
+            None => Ok(None),
             Some(expiry) => {
-                match expiry.duration_since(SystemTime::now()) {
-                    Ok(duration) => Ok(Some(duration.as_secs())),
-                    Err(_) => Err("Key is expired".to_string()),
-                }
+                let duration = expiry.duration_since(SystemTime::now()).unwrap();
+                Ok(Some(duration.as_secs()))
             }
         }
     }
