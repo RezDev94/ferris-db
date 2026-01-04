@@ -1,5 +1,6 @@
 #[derive(Debug)]
 pub enum Command {
+    PING,
     Get {
         key: String,
     },
@@ -33,6 +34,7 @@ impl Command {
         let parts: Vec<&str> = input.trim().splitn(4, ' ').collect();
 
         match parts.as_slice() {
+            ["PING"] => Command::PING,
             ["GET", key] => Command::Get {
                 key: key.to_string(),
             },

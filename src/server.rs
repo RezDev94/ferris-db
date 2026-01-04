@@ -55,6 +55,7 @@ async fn execute_command(input: &str, store: &Arc<Mutex<Store>>) -> String {
     let mut store = store.lock().await;
 
     match command {
+        Command::PING => "PONG\nEND\n".to_string(),
         Command::Get { key } => match store.get(&key) {
             Some(value) => format!("{}\n", value),
             None => "ERROR: Key not found\n".to_string(),
