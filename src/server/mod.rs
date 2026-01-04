@@ -3,14 +3,15 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
 
-use super::command::Command;
-use super::store::Store;
+use crate::core::{Command, Store};
+use crate::persistence::FilePersistence;
 
 pub async fn run_server(addr: &str) -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(addr).await?;
     println!("ferris-db server listening on {}", addr);
 
-    let store = Arc::new(Mutex::new(Store::new()));
+    let persistence = Arc::new(FilePersistence::new("data.json"));
+    let store = Arc::new(Mutex::new(Store::new(persistence)));
 
     loop {
         let (socket, peer_addr) = listener.accept().await?;
@@ -51,14 +52,18 @@ async fn handle_client(
 }
 
 async fn execute_command(input: &str, store: &Arc<Mutex<Store>>) -> String {
-    let command = Command::parse(input);
+    let command = match Command::parse(input) {
+        Ok(cmd) => cmd,
+        Err(e) => return format!("ERROR: {}\n", e),
+    };
+    
     let mut store = store.lock().await;
 
     match command {
         Command::PING => "PONG\nEND\n".to_string(),
         Command::Get { key } => match store.get(&key) {
-            Some(value) => format!("{}\n", value),
-            None => "ERROR: Key not found\n".to_string(),
+            Ok(value) => format!("{}\n", value),
+            Err(e) => format!("ERROR: {}\n", e),
         },
         Command::Set { key, value, ttl } => {
             match store.set(key, value, ttl) {
@@ -78,7 +83,7 @@ async fn execute_command(input: &str, store: &Arc<Mutex<Store>>) -> String {
             Ok(()) => "OK\n".to_string(),
             Err(e) => format!("ERROR: {}\n", e),
         },
-        Command::TTL { key } => match store.ttl(key) {
+        Command::TTL { key } => match store.ttl(&key) {
             Ok(ttl) => match ttl {
                 Some(ttl) => format!("{}\n", ttl),
                 None => "(no ttl)\nEND\n".to_string(),
@@ -103,6 +108,5 @@ async fn execute_command(input: &str, store: &Arc<Mutex<Store>>) -> String {
             Ok(()) => "OK\n".to_string(),
             Err(e) => format!("ERROR: {}\n", e),
         },
-        Command::Unknown(msg) => format!("ERROR: {}\n", msg.trim()),
     }
 }

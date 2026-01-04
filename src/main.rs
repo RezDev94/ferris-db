@@ -1,5 +1,5 @@
-mod store;
-mod command;
+mod core;
+mod persistence;
 mod server;
 
 use std::env;

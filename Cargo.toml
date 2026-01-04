@@ -9,7 +9,11 @@ path = "src/main.rs"
 
 [[bin]]
 name = "ferris-cli"
-path = "src/bin/ferris-cli.rs"
+path = "src/cli/mod.rs"
+
+[lib]
+name = "ferris_db"
+path = "src/lib.rs"
 
 [dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
