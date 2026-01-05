@@ -29,6 +29,7 @@ cargo run --bin ferris-cli SET key value 100
 
 | Command | Description | Example |
 | ------- | ----------- | ------- |
+| PING | Check server health | `PING` |
 | SET | Set a new record (TTL is optional) | `SET key value 100` |
 | GET | Get value using the key | `GET key` |
 | DELETE | Delete a record using the key | `DELETE key` |
